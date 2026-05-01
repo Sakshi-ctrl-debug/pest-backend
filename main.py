@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image
 import numpy as np
-import tensorflow as tf
+from tflite_runtime.interpreter import Interpreter
 import io
 import json
 from pest_info import PEST_INFO
@@ -10,8 +10,11 @@ from pest_info import PEST_INFO
 app = FastAPI()
 
 # Load model once at startup
-print("🔄 Loading TensorFlow model...")
-model = tf.keras.models.load_model("pest_model.h5")
+print("🔄 Loading TFLite model...")
+interpreter = Interpreter(model_path="pest_model.tflite")
+interpreter.allocate_tensors()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 print("✅ Model loaded successfully")
 
 # Load class names
@@ -66,8 +69,10 @@ async def detect_pest(file: UploadFile = File(...)):
         # Preprocess
         processed = preprocess(image)
 
-        # Predict
-        pred = model.predict(processed)[0]
+        # Predict with TFLite
+        interpreter.set_tensor(input_details[0]["index"], processed.astype(np.float32))
+        interpreter.invoke()
+        pred = interpreter.get_tensor(output_details[0]["index"])[0]
         idx = int(np.argmax(pred))
 
         pest_name = classes[idx]
