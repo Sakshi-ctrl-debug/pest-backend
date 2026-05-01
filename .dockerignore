@@ -1,0 +1,11 @@
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+old files/
+pest_dataset/
+pest_dataset_old/
+.git
+.gitignore
+.DS_Store
