@@ -27,17 +27,15 @@ print("")
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint to verify backend is running"""
     return {
         "status": "healthy",
         "message": "Backend is running and ready for pest detection",
-        "model": "pest_model.h5",
+        "model": "pest_model.tflite",
         "classes": len(classes)
     }
 
 @app.get("/")
 async def root():
-    """Root endpoint"""
     return {
         "name": "Pest Detection Backend",
         "version": "1.0",
@@ -49,9 +47,8 @@ async def root():
     }
 
 def preprocess(image):
-    # Optimized preprocessing
-    image = image.resize((224, 224), Image.Resampling.LANCZOS)  # Better quality resize
-    img = np.array(image, dtype=np.float32) / 255.0  # Use float32 for better precision
+    image = image.resize((224, 224), Image.Resampling.LANCZOS)
+    img = np.array(image, dtype=np.float32) / 255.0
     img = np.expand_dims(img, axis=0)
     return img
 
@@ -69,7 +66,7 @@ async def detect_pest(file: UploadFile = File(...)):
         # Preprocess
         processed = preprocess(image)
 
-        # Predict with TFLite
+        # Predict
         interpreter.set_tensor(input_details[0]["index"], processed.astype(np.float32))
         interpreter.invoke()
         pred = interpreter.get_tensor(output_details[0]["index"])[0]
@@ -80,12 +77,32 @@ async def detect_pest(file: UploadFile = File(...)):
 
         print(f"🐛 Prediction: {pest_name} ({confidence})")
 
-        # Get info
-        info = PEST_INFO.get(pest_name, {
-            "damage": "No data available",
-            "prevention": "No data available",
-            "treatment": "No data available"
-        })
+        # ✅ UPDATED INFO HANDLING (BILINGUAL)
+        raw_info = PEST_INFO.get(pest_name)
+
+        if raw_info:
+            info = {
+                "marathi_name": raw_info.get("marathi_name", "N/A"),
+
+                "damage_en": raw_info.get("damage", {}).get("en", "No data"),
+                "damage_mr": raw_info.get("damage", {}).get("mr", "माहिती उपलब्ध नाही"),
+
+                "prevention_en": raw_info.get("prevention", {}).get("en", "No data"),
+                "prevention_mr": raw_info.get("prevention", {}).get("mr", "माहिती उपलब्ध नाही"),
+
+                "treatment_en": raw_info.get("treatment", {}).get("en", "No data"),
+                "treatment_mr": raw_info.get("treatment", {}).get("mr", "माहिती उपलब्ध नाही"),
+            }
+        else:
+            info = {
+                "marathi_name": "N/A",
+                "damage_en": "No data available",
+                "damage_mr": "माहिती उपलब्ध नाही",
+                "prevention_en": "No data available",
+                "prevention_mr": "माहिती उपलब्ध नाही",
+                "treatment_en": "No data available",
+                "treatment_mr": "माहिती उपलब्ध नाही",
+            }
 
         result = {
             "pest": pest_name,
